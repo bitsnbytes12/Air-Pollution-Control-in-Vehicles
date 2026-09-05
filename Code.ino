@@ -1,117 +1,225 @@
-#include <Wire.h>
+```cpp
 #include <LiquidCrystal.h>
-#include <HardwareSerial.h>
+#include <SoftwareSerial.h>
 
-// LCD pins
-const int rs = 11, en = 12, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
+// =====================================================
+// LCD PINS
+// =====================================================
+const int rs = 11;
+const int en = 12;
+const int d4 = 5;
+const int d5 = 4;
+const int d6 = 3;
+const int d7 = 2;
+
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
-// Sensor pins
-const int mq135Pin = 32; // MQ135 connected to A0
-const int mq7Pin = 33;   // MQ7 connected to A1
-const int mq5Pin = 35;   // MQ5 connected to A2
+// =====================================================
+// GAS SENSOR PINS - ARDUINO UNO
+// =====================================================
+const int mq135Pin = A0;
+const int mq7Pin   = A1;
+const int mq5Pin   = A2;
 
-// GSM module pins
-#define RXD2 16  // ESP32 RX pin connected to SIM800L TX
-#define TXD2 17  // ESP32 TX pin connected to SIM800L RX
-#define RESET_PIN 5 // Reset pin (optional)
+// =====================================================
+// SIM800L GSM PINS - ARDUINO UNO
+// =====================================================
+// Arduino UNO RX <- SIM800L TX
+// Arduino UNO TX -> SIM800L RX
 
-// Initialize hardware serial for GSM communication
-HardwareSerial gsm(1);  // UART1 for SIM800L
+const int gsmRX = 7;
+const int gsmTX = 8;
 
+SoftwareSerial gsm(gsmRX, gsmTX);
+
+// =====================================================
+// POLLUTION THRESHOLDS
+// =====================================================
+const int mq135Threshold = 500;
+const int mq7Threshold   = 500;
+const int mq5Threshold   = 500;
+
+// =====================================================
+// PHONE NUMBER
+// =====================================================
+String phoneNumber = "+1234567890";
+// Replace with your actual phone number
+
+// =====================================================
+// SETUP
+// =====================================================
 void setup() {
-  // Initialize LCD
-  lcd.begin(16,2);
-  
-  // Print a welcome message to the LCD
+
+  // Serial Monitor
+  Serial.begin(9600);
+
+  // GSM
+  gsm.begin(9600);
+
+  // LCD
+  lcd.begin(16, 2);
+
+  // Welcome message
   lcd.setCursor(0, 0);
-  lcd.print("Gas Sensor Test");
+  lcd.print("AIR POLLUTION");
+  lcd.setCursor(0, 1);
+  lcd.print("MONITORING");
+
   delay(2000);
   lcd.clear();
-  
-  // Initialize serial communication (for debugging)
-  Serial.begin(115200);
-  gsm.begin(9600, SERIAL_8N1, RXD2, TXD2);  // Start GSM communication
-  
-  // Initialize GSM module
-  pinMode(RESET_PIN, OUTPUT);
-  digitalWrite(RESET_PIN, HIGH); // Keep module on
-  
-  Serial.println("Initializing GSM module...");
-  sendATCommand("AT");
-  sendATCommand("AT+CPIN?");  // Check if SIM card is ready
-  sendATCommand("AT+CREG?");  // Check network registration
-  sendATCommand("AT+CMGF=1");  // Set SMS mode to text
 
-  delay(2000); // Wait for GSM module to stabilize
+  Serial.println("================================");
+  Serial.println("Air Pollution Monitoring System");
+  Serial.println("Arduino UNO + SIM800L");
+  Serial.println("================================");
+
+  // Initialize GSM
+  Serial.println("Initializing GSM...");
+
+  sendATCommand("AT");
+  sendATCommand("AT+CPIN?");
+  sendATCommand("AT+CREG?");
+  sendATCommand("AT+CMGF=1");
+
+  delay(2000);
+
+  Serial.println("System Ready");
 }
 
+// =====================================================
+// MAIN LOOP
+// =====================================================
 void loop() {
-  // Read sensor values
+
+  // Read gas sensors
   int mq135Value = analogRead(mq135Pin);
-  int mq7Value = analogRead(mq7Pin);
-  int mq5Value = analogRead(mq5Pin);
-  
-  // Display sensor values on the LCD
+  int mq7Value   = analogRead(mq7Pin);
+  int mq5Value   = analogRead(mq5Pin);
+
+  // ===================================================
+  // SERIAL MONITOR
+  // ===================================================
+
+  Serial.print("MQ-135: ");
+  Serial.print(mq135Value);
+
+  Serial.print(" | MQ-7: ");
+  Serial.print(mq7Value);
+
+  Serial.print(" | MQ-5: ");
+  Serial.println(mq5Value);
+
+  // ===================================================
+  // LCD DISPLAY
+  // ===================================================
+
+  lcd.clear();
+
   lcd.setCursor(0, 0);
-  lcd.print("M135:");
+  lcd.print("135:");
   lcd.print(mq135Value);
-  
+
   lcd.setCursor(9, 0);
-  lcd.print("M7:");
+  lcd.print("7:");
   lcd.print(mq7Value);
-  
+
   lcd.setCursor(0, 1);
-  lcd.print("M5:");
+  lcd.print("5:");
   lcd.print(mq5Value);
 
-  // Print sensor values to the serial monitor
-  Serial.print("MQ135: ");
-  Serial.print(mq135Value);
-  Serial.print(" | MQ7: ");
-  Serial.print(mq7Value);
-  Serial.print(" | MQ5: ");
-  Serial.println(mq5Value);
-  
-  // Example: Trigger an SMS if MQ135 value exceeds threshold
-  if (mq135Value > 500) {
-    String phoneNumber = "+1234567890";  // Replace with destination phone number
-    String message = "Warning: High gas levels detected! MQ135 value: " + String(mq135Value);
+  // ===================================================
+  // POLLUTION DETECTION
+  // ===================================================
+
+  if (mq135Value > mq135Threshold ||
+      mq7Value > mq7Threshold ||
+      mq5Value > mq5Threshold) {
+
+    Serial.println("WARNING: HIGH GAS LEVEL DETECTED!");
+
+    delay(500);
+
+    // Display warning
+    lcd.clear();
+
+    lcd.setCursor(0, 0);
+    lcd.print("WARNING!");
+
+    lcd.setCursor(0, 1);
+    lcd.print("HIGH POLLUTION");
+
+    // Create SMS
+    String message =
+      "Vehicle Pollution Warning! "
+      "MQ135=" + String(mq135Value) +
+      " MQ7=" + String(mq7Value) +
+      " MQ5=" + String(mq5Value);
+
+    // Send SMS
     sendSMS(phoneNumber, message);
+
+    // Wait before checking again
+    delay(10000);
+
+  } else {
+
+    Serial.println("Pollution Level: NORMAL");
+
   }
 
-  // Delay before the next loop iteration
   delay(2000);
 }
 
-// Function to send AT commands to the GSM module
-void sendATCommand(String cmd) {
-  gsm.println(cmd);
-  delay(1000);  // Give the module time to respond
+// =====================================================
+// SEND AT COMMAND
+// =====================================================
+void sendATCommand(String command) {
+
+  Serial.print("AT Command: ");
+  Serial.println(command);
+
+  gsm.println(command);
+
+  delay(1000);
+
   while (gsm.available()) {
+
     String response = gsm.readString();
-    Serial.print("Response: ");
+
+    Serial.print("GSM Response: ");
     Serial.println(response);
   }
 }
 
-// Function to send SMS
-void sendSMS(String phoneNumber, String message) {
+// =====================================================
+// SEND SMS
+// =====================================================
+void sendSMS(String number, String message) {
+
   Serial.println("Sending SMS...");
-  
-  // Start SMS text mode
+
+  // Set SMS text mode
+  gsm.println("AT+CMGF=1");
+
+  delay(1000);
+
+  // Select recipient
   gsm.print("AT+CMGS=\"");
-  gsm.print(phoneNumber);
+  gsm.print(number);
   gsm.println("\"");
-  delay(1000);  // Wait for prompt
-  
-  // Send the actual message content
+
+  delay(1000);
+
+  // Send message
   gsm.print(message);
-  delay(1000);
-  
-  // End the message by sending Ctrl+Z character
+
+  delay(500);
+
+  // Ctrl + Z
   gsm.write(26);
-  delay(1000);
-  
-  Serial.println("SMS Sent!");
+
+  delay(5000);
+
+  Serial.println("SMS process completed.");
 }
+```
