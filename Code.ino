@@ -1,4 +1,3 @@
-```cpp
 #include <LiquidCrystal.h>
 #include <SoftwareSerial.h>
 
@@ -222,4 +221,4 @@ void sendSMS(String number, String message) {
 
   Serial.println("SMS process completed.");
 }
-```
+
