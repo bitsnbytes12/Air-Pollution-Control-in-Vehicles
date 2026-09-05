@@ -1,21 +1,18 @@
-#include <LiquidCrystal.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
 #include <SoftwareSerial.h>
 
 // =====================================================
-// LCD PINS
+// LCD I2C
 // =====================================================
-const int rs = 11;
-const int en = 12;
-const int d4 = 5;
-const int d5 = 4;
-const int d6 = 3;
-const int d7 = 2;
-
-LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+// Common I2C address: 0x27
+// If your LCD does not work, try 0x3F.
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 // =====================================================
 // GAS SENSOR PINS - ARDUINO UNO
 // =====================================================
+
 const int mq135Pin = A0;
 const int mq7Pin   = A1;
 const int mq5Pin   = A2;
@@ -23,8 +20,12 @@ const int mq5Pin   = A2;
 // =====================================================
 // SIM800L GSM PINS - ARDUINO UNO
 // =====================================================
-// Arduino UNO RX <- SIM800L TX
-// Arduino UNO TX -> SIM800L RX
+
+// Arduino UNO D7 = RX
+// Arduino UNO D8 = TX
+//
+// SIM800L TX → Arduino D7
+// SIM800L RX → Arduino D8
 
 const int gsmRX = 7;
 const int gsmTX = 8;
@@ -34,6 +35,7 @@ SoftwareSerial gsm(gsmRX, gsmTX);
 // =====================================================
 // POLLUTION THRESHOLDS
 // =====================================================
+
 const int mq135Threshold = 500;
 const int mq7Threshold   = 500;
 const int mq5Threshold   = 500;
@@ -41,12 +43,14 @@ const int mq5Threshold   = 500;
 // =====================================================
 // PHONE NUMBER
 // =====================================================
+
 String phoneNumber = "+1234567890";
 // Replace with your actual phone number
 
 // =====================================================
 // SETUP
 // =====================================================
+
 void setup() {
 
   // Serial Monitor
@@ -55,24 +59,32 @@ void setup() {
   // GSM
   gsm.begin(9600);
 
-  // LCD
-  lcd.begin(16, 2);
+  // LCD I2C
+  lcd.init();
+  lcd.backlight();
 
   // Welcome message
   lcd.setCursor(0, 0);
   lcd.print("AIR POLLUTION");
+
   lcd.setCursor(0, 1);
   lcd.print("MONITORING");
 
   delay(2000);
+
   lcd.clear();
 
+  // Serial information
   Serial.println("================================");
   Serial.println("Air Pollution Monitoring System");
+  Serial.println("Arduino UNO + MQ Sensors");
   Serial.println("Arduino UNO + SIM800L");
   Serial.println("================================");
 
-  // Initialize GSM
+  // ===================================================
+  // GSM INITIALIZATION
+  // ===================================================
+
   Serial.println("Initializing GSM...");
 
   sendATCommand("AT");
@@ -88,9 +100,13 @@ void setup() {
 // =====================================================
 // MAIN LOOP
 // =====================================================
+
 void loop() {
 
-  // Read gas sensors
+  // ===================================================
+  // READ GAS SENSORS
+  // ===================================================
+
   int mq135Value = analogRead(mq135Pin);
   int mq7Value   = analogRead(mq7Pin);
   int mq5Value   = analogRead(mq5Pin);
@@ -114,6 +130,7 @@ void loop() {
 
   lcd.clear();
 
+  // First line
   lcd.setCursor(0, 0);
   lcd.print("135:");
   lcd.print(mq135Value);
@@ -122,6 +139,7 @@ void loop() {
   lcd.print("7:");
   lcd.print(mq7Value);
 
+  // Second line
   lcd.setCursor(0, 1);
   lcd.print("5:");
   lcd.print(mq5Value);
@@ -147,17 +165,23 @@ void loop() {
     lcd.setCursor(0, 1);
     lcd.print("HIGH POLLUTION");
 
-    // Create SMS
+    // =================================================
+    // CREATE SMS
+    // =================================================
+
     String message =
       "Vehicle Pollution Warning! "
       "MQ135=" + String(mq135Value) +
       " MQ7=" + String(mq7Value) +
       " MQ5=" + String(mq5Value);
 
-    // Send SMS
+    // =================================================
+    // SEND SMS
+    // =================================================
+
     sendSMS(phoneNumber, message);
 
-    // Wait before checking again
+    // Prevent repeated SMS immediately
     delay(10000);
 
   } else {
@@ -172,6 +196,7 @@ void loop() {
 // =====================================================
 // SEND AT COMMAND
 // =====================================================
+
 void sendATCommand(String command) {
 
   Serial.print("AT Command: ");
@@ -193,6 +218,7 @@ void sendATCommand(String command) {
 // =====================================================
 // SEND SMS
 // =====================================================
+
 void sendSMS(String number, String message) {
 
   Serial.println("Sending SMS...");
@@ -221,4 +247,3 @@ void sendSMS(String number, String message) {
 
   Serial.println("SMS process completed.");
 }
-
